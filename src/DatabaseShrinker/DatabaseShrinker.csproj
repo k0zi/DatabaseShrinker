@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <PackAsTool>true</PackAsTool>
+        <ToolCommandName>shrinkdb</ToolCommandName>
+        <PackageOutputPath>./nupkg</PackageOutputPath>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <None Remove="SqlScripts\CheckDbccState.sql" />
+      <EmbeddedResource Include="SqlScripts\CheckDbccState.sql" />
+      <None Remove="SqlScripts\GetDatabaseFiles.sql" />
+      <EmbeddedResource Include="SqlScripts\GetDatabaseFiles.sql" />
+      <None Remove="SqlScripts\ListUserDatabases.sql" />
+      <EmbeddedResource Include="SqlScripts\ListUserDatabases.sql" />
+      <None Remove="SqlScripts\ShinkDatabaseFile.sql" />
+      <EmbeddedResource Include="SqlScripts\ShinkDatabaseFile.sql" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.2" />
+      <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.6" />
+      <PackageReference Include="Spectre.Console" Version="0.50.0" />
+      <PackageReference Include="Spectre.Console.Cli" Version="0.50.0" />
+    </ItemGroup>
+
+</Project>

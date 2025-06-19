@@ -1,0 +1,2 @@
+Use [{0}]
+DBCC SHRINKFILE (N'{1}', 1)

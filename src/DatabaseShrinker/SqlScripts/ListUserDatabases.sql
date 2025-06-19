@@ -1,0 +1,1 @@
+select [name] from sys.databases where database_id > 4

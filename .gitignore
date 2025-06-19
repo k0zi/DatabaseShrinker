@@ -1,0 +1,6 @@
+
+/src/.idea
+/src/DatabaseShrinker/bin
+/src/DatabaseShrinker/obj
+*.user
+/src/DatabaseShrinker/nupkg
