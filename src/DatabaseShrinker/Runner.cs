@@ -37,7 +37,7 @@ public class Runner
         {
             return;
         }
-        DisplayDatabaseSizes(connector);
+        var dbSizes = DisplayDatabaseSizes(connector);
         var confirmation = AnsiConsole.Prompt(
             new TextPrompt<bool>("Shrink database(s)?")
                 .AddChoice(true)
@@ -48,7 +48,23 @@ public class Runner
         {
             return;
         }
+
+        var largeOnly = AnsiConsole.Prompt(
+            new TextPrompt<bool>("Only large database(s)?")
+            .AddChoice(true)
+            .AddChoice(false)
+            .DefaultValue(true)
+            .WithConverter(choice => choice ? "y" : "n"));
+        
         var databasePairs = GetDatabasePairs(connector, databases);
+        if (largeOnly)
+        {
+            var largeDbSizes = dbSizes.Where(ds => ds.FreeSizeMb > 1024);
+            databasePairs = databasePairs.Where(dp =>
+                largeDbSizes.Select(l => l.FileName).Contains(dp.File) &&
+                largeDbSizes.Select(l => l.DbName).Contains(dp.Database))
+                .ToArray();
+        }
         AnsiConsole.Markup($"[darkcyan]Shrinking database files[/]");
         AnsiConsole.Progress()
             .Start(ctx =>
@@ -63,12 +79,17 @@ public class Runner
                     sqlTasks.Add(shrinkProcess.Item2);
                 }
 
+                foreach (var sqlTask in sqlTasks)
+                {
+                    sqlTask.Start();
+                }
+
                 while(!ctx.IsFinished) 
                 {
                     foreach (var dbccProcess in tasks)
                     {
                         var prevState = dbccProcess.Progress;
-                        dbccProcess.Progress = connector.CheckDbccState(dbccProcess.ClientConnectionId);
+                        dbccProcess.Progress = connector.CheckDbccState(dbccProcess.SessionId);
                         Debug.WriteLine($"Prev: {prevState}; State {dbccProcess.Progress}");
                         var increment = dbccProcess.Progress - prevState;
                         dbccProcess.ProgressTask.Increment(increment);
@@ -81,7 +102,7 @@ public class Runner
         DisplayDatabaseSizes(connector);
     }
 
-    private static void DisplayDatabaseSizes(SqlConnector connector)
+    private static DbSize[] DisplayDatabaseSizes(SqlConnector connector)
     {
         var result = connector.QueryDbSizes();
         var table = new Table().LeftAligned().Border(TableBorder.Rounded);
@@ -105,6 +126,7 @@ public class Runner
                     ctx.Refresh();
                 }
             });
+        return result.ToArray();
     }
 
     public void RunConnectionStrings(string[] connectionStrings)

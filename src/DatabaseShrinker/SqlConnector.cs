@@ -59,26 +59,26 @@ public class SqlConnector(string connectionString,
         return databases.ToArray();
     }
 
-    public Tuple<Guid,Task> ShrinkDatabaseFile(string database, string databaseFile)
+    public Tuple<int,Task> ShrinkDatabaseFile(string database, string databaseFile)
     {
         var connection = new SqlConnection(connectionString);
         connection.Open();
-        var sqlTask = Task.Factory.StartNew(() =>
+        var sqlTask = new Task(() =>
         {
             var command = new SqlCommand(string.Format(sqlScripts.ShrinkDatabaseFile, database, databaseFile),
                 connection);
             command.CommandTimeout = 3600;
             command.ExecuteNonQuery();
         });
-        return new Tuple<Guid, Task>(connection.ClientConnectionId, sqlTask);
+        return new Tuple<int, Task>(connection.ServerProcessId, sqlTask);
     }
 
-    public double CheckDbccState(Guid clientId)
+    public double CheckDbccState(int sessionId)
     {
         GuardConnection();
         if(_connection?.State != ConnectionState.Open)
             _connection?.Open();
-        var command = new SqlCommand(string.Format(sqlScripts.CheckDbccState, clientId), _connection);
+        var command = new SqlCommand(string.Format(sqlScripts.CheckDbccState, sessionId), _connection);
         using var reader = command.ExecuteReader();
         return reader.Read() ? reader.GetFloat(0) : 100.00001;
     }

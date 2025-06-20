@@ -1,1 +1,1 @@
-select [percent_complete] from sys.dm_exec_requests where command = N'DbccFilesCompact' and connection_id = N'{0}'
+select [percent_complete] from sys.dm_exec_requests where command = N'DbccFilesCompact' and session_id = {0}
