@@ -38,6 +38,16 @@ public class Runner
             return;
         }
         DisplayDatabaseSizes(connector);
+        var confirmation = AnsiConsole.Prompt(
+            new TextPrompt<bool>("Shrink database(s)?")
+                .AddChoice(true)
+                .AddChoice(false)
+                .DefaultValue(true)
+                .WithConverter(choice => choice ? "y" : "n"));
+        if (!confirmation)
+        {
+            return;
+        }
         var databasePairs = GetDatabasePairs(connector, databases);
         AnsiConsole.Markup($"[darkcyan]Shrinking database files[/]");
         AnsiConsole.Progress()
@@ -74,7 +84,7 @@ public class Runner
     private static void DisplayDatabaseSizes(SqlConnector connector)
     {
         var result = connector.QueryDbSizes();
-        var table = new Table().LeftAligned();
+        var table = new Table().LeftAligned().Border(TableBorder.Rounded);
         table.AddColumn("DbName");
         table.AddColumn("FileName");
         table.AddColumn("Type");
@@ -85,8 +95,13 @@ public class Runner
             {
                 foreach (var dbSize in result)
                 {
-                    table.AddRow(dbSize.DbName, dbSize.FileName, dbSize.TypeDesc, dbSize.CurrentSizeMb.ToString(),
-                        dbSize.FreeSizeMb.ToString());
+
+                    var diffText = new Markup(dbSize.FreeSizeMb > 10240 ? $"[red]{dbSize.FreeSizeMb.ToString()}[/]" : dbSize.FreeSizeMb > 1024 ? $"[gold1]{dbSize.FreeSizeMb.ToString()}[/]" : $"[green]{dbSize.FreeSizeMb.ToString()}[/]");
+                    table.AddRow(new Markup(dbSize.DbName), 
+                        new Markup(dbSize.FileName), 
+                        new Markup(dbSize.TypeDesc), 
+                        new Markup(dbSize.CurrentSizeMb.ToString()),
+                        diffText);
                     ctx.Refresh();
                 }
             });
