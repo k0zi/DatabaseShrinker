@@ -20,6 +20,10 @@
       <EmbeddedResource Include="SqlScripts\ListUserDatabases.sql" />
       <None Remove="SqlScripts\ShinkDatabaseFile.sql" />
       <EmbeddedResource Include="SqlScripts\ShinkDatabaseFile.sql" />
+      <None Remove="SqlScripts\QueryDbSizes.sql" />
+      <EmbeddedResource Include="SqlScripts\QueryDbSizes.sql">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </EmbeddedResource>
     </ItemGroup>
 
     <ItemGroup>

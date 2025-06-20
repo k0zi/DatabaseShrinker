@@ -59,22 +59,43 @@ public class SqlConnector(string connectionString,
         return databases.ToArray();
     }
 
-    public void ShrinkDatabaseFile(string database, string databaseFile)
+    public Tuple<Guid,Task> ShrinkDatabaseFile(string database, string databaseFile)
     {
         var connection = new SqlConnection(connectionString);
-
-        var command = new SqlCommand(string.Format(sqlScripts.ShrinkDatabaseFile, database, databaseFile), connection);
-        command.CommandTimeout = 3600;
-        command.ExecuteNonQuery();
+        connection.Open();
+        var sqlTask = Task.Factory.StartNew(() =>
+        {
+            var command = new SqlCommand(string.Format(sqlScripts.ShrinkDatabaseFile, database, databaseFile),
+                connection);
+            command.CommandTimeout = 3600;
+            command.ExecuteNonQuery();
+        });
+        return new Tuple<Guid, Task>(connection.ClientConnectionId, sqlTask);
     }
 
-    public double CheckDbccState()
+    public double CheckDbccState(Guid clientId)
     {
         GuardConnection();
         if(_connection?.State != ConnectionState.Open)
             _connection?.Open();
-        var command = new SqlCommand(sqlScripts.CheckDbccState, _connection);
+        var command = new SqlCommand(string.Format(sqlScripts.CheckDbccState, clientId), _connection);
         using var reader = command.ExecuteReader();
         return reader.Read() ? reader.GetFloat(0) : 100.00001;
+    }
+
+    public List<DbSize> QueryDbSizes()
+    {
+        GuardConnection();
+        if(_connection?.State != ConnectionState.Open)
+            _connection?.Open();
+        var query = new SqlCommand(sqlScripts.QueryDbSizes, _connection);
+        using var reader = query.ExecuteReader();
+        var result = new List<DbSize>();
+        while (reader.Read())
+        {
+            result.Add(new DbSize(DbName: reader.GetString("DbName"),FileName: reader.GetString("FileName"),TypeDesc: reader.GetString("type_desc"),CurrentSizeMb:reader.GetDecimal("CurrentSizeMB"), FreeSizeMb:reader.GetDecimal("FreeSpaceMB")));
+        }
+
+        return result;
     }
 }

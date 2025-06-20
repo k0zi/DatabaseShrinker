@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using DatabaseShrinker;
 using Spectre.Console;
 
@@ -7,71 +8,88 @@ public class Runner
     {
         SqlConnector connector = null;
         bool isValid = true;
-        AnsiConsole.Status()
-            .Start("Configuring..", ctx =>
-            {
-                connector = new SqlConnector(connectionString, new SqlScripts());
-                AnsiConsole.WriteLine($"Validating: {connectionString}");
-                ctx.Status("Validating connection string");
-                ctx.Spinner(Spinner.Known.Dots);
-                ctx.SpinnerStyle(Style.Parse("green"));
-                isValid = connector.IsConnectionValid();
-                Thread.Sleep(1000);
-                if (isValid)
-                {
-                    AnsiConsole.MarkupLine($"[green]Ok[/]");
-                }
-                else
-                {
-                    AnsiConsole.MarkupLine($"[red]Failed[/]");
-                }
-            });
+        connector = new SqlConnector(connectionString, new SqlScripts());
+        AnsiConsole.Markup($"Validating:[gold1]{connectionString}[/]     ");
+        isValid = connector.IsConnectionValid();
+        if (isValid)
+        {
+            AnsiConsole.MarkupLine($"[green]Ok[/]");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine($"[red]Failed[/]");
+        }
+
         if (!isValid)
         {
             return;
         }
 
         string[] databases = [];
-        AnsiConsole.Status()
-            .Start("Getting database(s)..", ctx =>
-            {
-                AnsiConsole.MarkupLine("Getting user database(s)");
-                ctx.Status("Quering...");
-                ctx.Spinner(Spinner.Known.Dots);
-                ctx.SpinnerStyle(Style.Parse("green"));
-                databases = connector.ListUserDatabases();
-                if (databases.Length == 0)
-                {
-                    AnsiConsole.MarkupLine("[red]No database![/]");
-                }
-            });
+        AnsiConsole.Markup("Getting user database(s)");
+        databases = connector.ListUserDatabases();
+        if (databases.Length == 0)
+        {
+            AnsiConsole.MarkupLine("   [red]No database![/]");
+        }
+
         if (databases.Length == 0)
         {
             return;
         }
-
-        foreach (var database in databases)
-        {
-            var files = connector.GetDatabaseFiles(database);
-            foreach (var file in files)
+        DisplayDatabaseSizes(connector);
+        var databasePairs = GetDatabasePairs(connector, databases);
+        AnsiConsole.Markup($"[darkcyan]Shrinking database files[/]");
+        AnsiConsole.Progress()
+            .Start(ctx =>
             {
-                AnsiConsole.Progress()
-                    .Start(proc =>
+                var tasks = new List<DbccProcess>();
+                var sqlTasks = new List<Task>();
+                foreach (var databasePair in databasePairs)
+                {
+                    var shrinkProcess = connector.ShrinkDatabaseFile(databasePair.Database, databasePair.File);
+                    var task = ctx.AddTask($"[darkcyan]{databasePair.Database} -> {databasePair.File}[/]");
+                    tasks.Add(new DbccProcess(shrinkProcess.Item1, task));
+                    sqlTasks.Add(shrinkProcess.Item2);
+                }
+
+                while(!ctx.IsFinished) 
+                {
+                    foreach (var dbccProcess in tasks)
                     {
-                        var task = proc.AddTask($"[darkcyan]Shrinking {file} of {database}[/]");
-                        Task.Factory.StartNew(() => connector.ShrinkDatabaseFile(database, file));
-                        double state = 0.0;
-                        while (state < 100.0 && !proc.IsFinished)
-                        {
-                            var prevState = state;
-                            state = connector.CheckDbccState();
-                            var increment = state - prevState;
-                            task.Increment((double)increment);
-                            Task.Delay(200);
-                        }
-                    });
-            }
-        }
+                        var prevState = dbccProcess.Progress;
+                        dbccProcess.Progress = connector.CheckDbccState(dbccProcess.ClientConnectionId);
+                        Debug.WriteLine($"Prev: {prevState}; State {dbccProcess.Progress}");
+                        var increment = dbccProcess.Progress - prevState;
+                        dbccProcess.ProgressTask.Increment(increment);
+                    }
+                }
+
+                Task.WaitAll(sqlTasks.ToArray());
+            });
+
+        DisplayDatabaseSizes(connector);
+    }
+
+    private static void DisplayDatabaseSizes(SqlConnector connector)
+    {
+        var result = connector.QueryDbSizes();
+        var table = new Table().LeftAligned();
+        table.AddColumn("DbName");
+        table.AddColumn("FileName");
+        table.AddColumn("Type");
+        table.AddColumn("Current Size MB");
+        table.AddColumn("Free Space MB");
+        AnsiConsole.Live(table)
+            .Start(ctx =>
+            {
+                foreach (var dbSize in result)
+                {
+                    table.AddRow(dbSize.DbName, dbSize.FileName, dbSize.TypeDesc, dbSize.CurrentSizeMb.ToString(),
+                        dbSize.FreeSizeMb.ToString());
+                    ctx.Refresh();
+                }
+            });
     }
 
     public void RunConnectionStrings(string[] connectionStrings)
@@ -80,5 +98,20 @@ public class Runner
         {
             RunConnectionString(connectionString);
         }
+    }
+
+    private DatabasePair[] GetDatabasePairs(SqlConnector connector, string[] databases)
+    {
+        var pairs = new List<DatabasePair>();
+        foreach (var database in databases)
+        {
+            var files = connector.GetDatabaseFiles(database);
+            foreach (var file in files)
+            {
+                pairs.Add(new DatabasePair(database, file));
+            }
+        }
+
+        return pairs.ToArray();
     }
 }
