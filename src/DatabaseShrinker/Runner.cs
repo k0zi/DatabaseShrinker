@@ -37,7 +37,9 @@ public class Runner
         {
             return;
         }
-        var dbSizes = DisplayDatabaseSizes(connector);
+        var dbSizes = DisplayDatabaseSizes(connector)
+            .Where(ds => ds.FreeSizeMb > 1024)
+            .ToArray();
         var confirmation = AnsiConsole.Prompt(
             new TextPrompt<bool>("Shrink database(s)?")
                 .AddChoice(true)
@@ -59,23 +61,21 @@ public class Runner
         var databasePairs = GetDatabasePairs(connector, databases);
         if (largeOnly)
         {
-            var largeDbSizes = dbSizes.Where(ds => ds.FreeSizeMb > 1024);
-            databasePairs = databasePairs.Where(dp =>
-                largeDbSizes.Select(l => l.FileName).Contains(dp.File) &&
-                largeDbSizes.Select(l => l.DbName).Contains(dp.Database))
+            databasePairs = databasePairs
+                .Where(dp => dbSizes.Any(ds => ds.DbName == dp.Database && ds.FileName == dp.File))
                 .ToArray();
         }
         AnsiConsole.Markup($"[darkcyan]Shrinking database files[/]");
         AnsiConsole.Progress()
             .Start(ctx =>
             {
-                var tasks = new List<DbccProcess>();
+                var dbccProcesses = new List<DbccProcess>();
                 var sqlTasks = new List<Task>();
                 foreach (var databasePair in databasePairs)
                 {
                     var shrinkProcess = connector.ShrinkDatabaseFile(databasePair.Database, databasePair.File);
-                    var task = ctx.AddTask($"[darkcyan]{databasePair.Database} -> {databasePair.File}[/]");
-                    tasks.Add(new DbccProcess(shrinkProcess.Item1, task));
+                    var task = ctx.AddTask($"[darkcyan]{databasePair.Database} -> {databasePair.File}[/]", autoStart:false);
+                    dbccProcesses.Add(new DbccProcess(shrinkProcess.Item1, task));
                     sqlTasks.Add(shrinkProcess.Item2);
                 }
 
@@ -84,9 +84,15 @@ public class Runner
                     sqlTask.Start();
                 }
 
-                while(!ctx.IsFinished) 
+                foreach (var dbccProcess in dbccProcesses)
                 {
-                    foreach (var dbccProcess in tasks)
+                    dbccProcess.ProgressTask.StartTask();
+                }
+
+                while(!ctx.IsFinished || sqlTasks.Any(t=>!t.IsCompleted)) 
+                {
+                    Thread.Sleep(50);
+                    foreach (var dbccProcess in dbccProcesses)
                     {
                         var prevState = dbccProcess.Progress;
                         dbccProcess.Progress = connector.CheckDbccState(dbccProcess.SessionId);

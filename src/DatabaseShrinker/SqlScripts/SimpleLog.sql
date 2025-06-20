@@ -1,0 +1,6 @@
+Use master
+ALTER DATABASE {0}
+SET RECOVERY SIMPLE;
+      
+ALTER DATABASE {0}
+    MODIFY FILE (NAME = {1}, SIZE = 0-- MB);
