@@ -127,7 +127,7 @@ public class Runner(ILogger logger,
             Log($"Dropping transaction log", setting.Log);
             foreach (var logFile in logFiles)
             {
-                connector.DropLog(logFile.Database);
+                connector.DropLog(logFile);
                 Log($"Dropping transaction log: {logFile.Database} -> {logFile.File}", setting.Log);
             }
         }
