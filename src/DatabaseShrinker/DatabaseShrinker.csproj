@@ -24,11 +24,17 @@
       <EmbeddedResource Include="SqlScripts\QueryDbSizes.sql">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </EmbeddedResource>
+      <None Remove="SqlScripts\SimpleLog.sql" />
+      <EmbeddedResource Include="SqlScripts\SimpleLog.sql">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </EmbeddedResource>
     </ItemGroup>
 
     <ItemGroup>
       <PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.2" />
       <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.6" />
+      <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.6" />
+      <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.6" />
       <PackageReference Include="Spectre.Console" Version="0.50.0" />
       <PackageReference Include="Spectre.Console.Cli" Version="0.50.0" />
     </ItemGroup>

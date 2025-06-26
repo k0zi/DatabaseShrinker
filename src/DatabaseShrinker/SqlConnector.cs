@@ -4,7 +4,7 @@ using Microsoft.Data.SqlClient;
 namespace DatabaseShrinker;
 
 public class SqlConnector(string connectionString,
-    SqlScripts sqlScripts)
+    SqlScripts sqlScripts) : ISqlConnector
 {
     private SqlConnection? _connection = null;
     public bool IsConnectionValid()
@@ -29,17 +29,19 @@ public class SqlConnector(string connectionString,
                 throw new InvalidOperationException("Connection is not valid!");
         }
     }
-    public string[] GetDatabaseFiles(string databaseName)
+    public DatabaseFile[] GetDatabaseFiles(string databaseName)
     {
         GuardConnection();
         if(_connection?.State != ConnectionState.Open)
             _connection?.Open();
         var command = new SqlCommand(string.Format(sqlScripts.GetDatabaseFiles, databaseName), _connection);
         using var reader = command.ExecuteReader();
-        var files = new List<string>();
+        var files = new List<DatabaseFile>();
         while (reader.Read())
         {
-            files.Add(reader.GetString(0));
+                files.Add(new DatabaseFile(databaseName, 
+                    reader.GetString("FileName"),
+                    (DbFileType)reader.GetByte("FileType")));
         }
         return files.ToArray();
     }
@@ -97,5 +99,15 @@ public class SqlConnector(string connectionString,
         }
 
         return result;
+    }
+
+    public void DropLog(DatabaseFile databaseFile)
+    {
+        GuardConnection();
+        if(_connection.State != ConnectionState.Open)
+            _connection.Open();
+        var command = new SqlCommand(string.Format(sqlScripts.SimpleLog, 
+            databaseFile.Database, databaseFile.File), _connection);
+        command.ExecuteNonQuery();
     }
 }

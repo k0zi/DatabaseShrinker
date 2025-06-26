@@ -1,5 +1,21 @@
 ﻿using DatabaseShrinker;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Spectre.Console;
+
+var builder = Host.CreateApplicationBuilder(args);
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+
+builder.Services.AddTransient<IRunner, Runner>();
+builder.Services.AddSingleton<SqlScripts>();
+builder.Services.AddTransient<ISqlConnectorFactory, SqlConnectorFactory>();
+builder.Services.AddTransient<Func<string, ISqlConnector>>(
+    sp => (string connectionString) => sp.GetRequiredService<ISqlConnectorFactory>().Create(connectionString));
+
+var host = builder.Build();
 
 if (args.Length == 0)
 {
@@ -8,26 +24,22 @@ if (args.Length == 0)
     return;
 }
 
-if (args[0] == "-v")
-{
-    AnsiConsole.WriteLine("Version: {0}", DatabaseShrinker.Help.GetVersion());
-    return;
-}
+var shrinkSetting = Help.GetSettings(args);
 
-if (args.Length == 1 || args[0] == "-h" || args.Length > 2 ||
-    !DatabaseShrinker.Help.GetValidCommands().Contains(args[0]))
+var RunCommand = (string commandArgument, Action<string, ShrinkSetting> action) =>
 {
-    AnsiConsole.WriteLine(DatabaseShrinker.Help.GetHelp());
-    return;
-}
+    var indexOf = args.ToList().IndexOf(commandArgument) + 1;
+    if (args.Length > indexOf)
+    {
+        action(args[indexOf], shrinkSetting);
+    }
+};
 
-if (args[0] == "-c")
+var logger = host.Services.GetRequiredService<ILogger<Program>>();
+var sqlConnectorFactory = host.Services.GetRequiredService<Func<string, ISqlConnector>>();
+var commands = Help.GetCommands(logger, sqlConnectorFactory);
+foreach(var command in commands
+    .Where(c => args.Contains(c.CommandArgument)))
 {
-    new Runner().RunConnectionString(args[1]);
-}
-
-if (args[0] == "-cs")
-{
-    var strings = new ConnectionStringLoader(args[1]).GetAllConnectionStrings();
-    new Runner().RunConnectionStrings(strings);
+    RunCommand(command.CommandArgument, command.CommandAction);   
 }

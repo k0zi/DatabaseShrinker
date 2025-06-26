@@ -1,23 +1,26 @@
 using System.Diagnostics;
 using DatabaseShrinker;
+using Microsoft.Extensions.Logging;
 using Spectre.Console;
 
-public class Runner
+public class Runner(ILogger logger,
+    Func<string, ISqlConnector> sqlConnectorFactory) : IRunner
 {
-    public void RunConnectionString(string connectionString)
+    public void RunConnectionString(string connectionString, ShrinkSetting setting)
     {
-        SqlConnector connector = null;
+        ISqlConnector connector = sqlConnectorFactory(connectionString);;
         bool isValid = true;
-        connector = new SqlConnector(connectionString, new SqlScripts());
         AnsiConsole.Markup($"Validating:[gold1]{connectionString}[/]     ");
         isValid = connector.IsConnectionValid();
         if (isValid)
         {
             AnsiConsole.MarkupLine($"[green]Ok[/]");
+            Log($"Connection string: {connectionString} is valid", setting.Log);
         }
         else
         {
             AnsiConsole.MarkupLine($"[red]Failed[/]");
+            Log($"Connection string: {connectionString} is not valid", setting.Log);
         }
 
         if (!isValid)
@@ -25,12 +28,15 @@ public class Runner
             return;
         }
 
+        
+
         string[] databases = [];
         AnsiConsole.Markup("Getting user database(s)");
         databases = connector.ListUserDatabases();
         if (databases.Length == 0)
         {
             AnsiConsole.MarkupLine("   [red]No database![/]");
+            Log($"Database not found on server", setting.Log);
         }
 
         if (databases.Length == 0)
@@ -40,7 +46,7 @@ public class Runner
         var dbSizes = DisplayDatabaseSizes(connector)
             .Where(ds => ds.FreeSizeMb > 1024)
             .ToArray();
-        var confirmation = AnsiConsole.Prompt(
+        bool confirmation = setting.AutoConfirm ? setting.AutoConfirm : AnsiConsole.Prompt(
             new TextPrompt<bool>("Shrink database(s)?")
                 .AddChoice(true)
                 .AddChoice(false)
@@ -50,33 +56,36 @@ public class Runner
         {
             return;
         }
-
-        var largeOnly = AnsiConsole.Prompt(
+        
+        bool largeOnly = setting.ShrinkOnlyLarge ? setting.ShrinkOnlyLarge :  AnsiConsole.Prompt(
             new TextPrompt<bool>("Only large database(s)?")
             .AddChoice(true)
             .AddChoice(false)
             .DefaultValue(true)
             .WithConverter(choice => choice ? "y" : "n"));
         
-        var databasePairs = GetDatabasePairs(connector, databases);
+        var databaseFiles = GetDatabaseFiles(connector, databases);
         if (largeOnly)
         {
-            databasePairs = databasePairs
+            databaseFiles = databaseFiles
                 .Where(dp => dbSizes.Any(ds => ds.DbName == dp.Database && ds.FileName == dp.File))
                 .ToArray();
         }
         AnsiConsole.Markup($"[darkcyan]Shrinking database files[/]");
+        Log($"Shrinking database files", setting.Log);
         AnsiConsole.Progress()
             .Start(ctx =>
             {
                 var dbccProcesses = new List<DbccProcess>();
                 var sqlTasks = new List<Task>();
-                foreach (var databasePair in databasePairs)
+                foreach (var databasePair in databaseFiles
+                             .Where(f => f.DbFileType == DbFileType.Data))
                 {
                     var shrinkProcess = connector.ShrinkDatabaseFile(databasePair.Database, databasePair.File);
                     var task = ctx.AddTask($"[darkcyan]{databasePair.Database} -> {databasePair.File}[/]", autoStart:false);
                     dbccProcesses.Add(new DbccProcess(shrinkProcess.Item1, task));
                     sqlTasks.Add(shrinkProcess.Item2);
+                    Log($"Database: {databasePair.Database} -> {databasePair.File}", setting.Log);
                 }
 
                 foreach (var sqlTask in sqlTasks)
@@ -104,11 +113,28 @@ public class Runner
 
                 Task.WaitAll(sqlTasks.ToArray());
             });
-
+        bool dropLog = setting.DropLog ? setting.DropLog :
+            AnsiConsole.Prompt(
+                new TextPrompt<bool>("Set recovery model to simple and drop transaction log?")
+                    .AddChoice(true)
+                    .AddChoice(false)
+                    .DefaultValue(true)
+                    .WithConverter(choice => choice ? "y" : "n"));
+        if (dropLog)
+        {
+            var logFiles = databaseFiles.Where(f => f.DbFileType == DbFileType.Log);
+            AnsiConsole.Markup($"[darkcyan]Dropping transaction log[/]");
+            Log($"Dropping transaction log", setting.Log);
+            foreach (var logFile in logFiles)
+            {
+                connector.DropLog(logFile.Database);
+                Log($"Dropping transaction log: {logFile.Database} -> {logFile.File}", setting.Log);
+            }
+        }
         DisplayDatabaseSizes(connector);
     }
 
-    private static DbSize[] DisplayDatabaseSizes(SqlConnector connector)
+    private static DbSize[] DisplayDatabaseSizes(ISqlConnector connector)
     {
         var result = connector.QueryDbSizes();
         var table = new Table().LeftAligned().Border(TableBorder.Rounded);
@@ -135,26 +161,33 @@ public class Runner
         return result.ToArray();
     }
 
-    public void RunConnectionStrings(string[] connectionStrings)
+    public void RunConnectionStrings(string jsonPath, ShrinkSetting setting)
+    {
+        var strings = new ConnectionStringLoader(jsonPath).GetAllConnectionStrings();
+        RunConnectionStrings(strings, setting);
+    }
+    private void RunConnectionStrings(string[] connectionStrings, ShrinkSetting setting)
     {
         foreach (var connectionString in connectionStrings)
         {
-            RunConnectionString(connectionString);
+            RunConnectionString(connectionString, setting);
         }
     }
 
-    private DatabasePair[] GetDatabasePairs(SqlConnector connector, string[] databases)
+    private DatabaseFile[] GetDatabaseFiles(ISqlConnector connector, string[] databases)
     {
-        var pairs = new List<DatabasePair>();
+        var pairs = new List<DatabaseFile>();
         foreach (var database in databases)
         {
-            var files = connector.GetDatabaseFiles(database);
-            foreach (var file in files)
-            {
-                pairs.Add(new DatabasePair(database, file));
-            }
+            return connector.GetDatabaseFiles(database);
         }
 
         return pairs.ToArray();
+    }
+    
+    private void Log(string message, bool isEnabled)
+    {
+        if(isEnabled)
+            logger.LogInformation(message);
     }
 }
