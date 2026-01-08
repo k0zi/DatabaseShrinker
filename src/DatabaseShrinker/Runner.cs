@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using DatabaseShrinker;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
 
@@ -127,8 +128,15 @@ public class Runner(ILogger logger,
             Log($"Dropping transaction log", setting.Log);
             foreach (var logFile in logFiles)
             {
-                connector.DropLog(logFile);
-                Log($"Dropping transaction log: {logFile.Database} -> {logFile.File}", setting.Log);
+                try
+                {
+                    connector.DropLog(logFile);
+                    Log($"Dropping transaction log: {logFile.Database} -> {logFile.File}", setting.Log);
+                }
+                catch (SqlException)
+                {
+                    Log($"Failed to drop transaction log: {logFile.Database} -> {logFile.File}", setting.Log);
+                }
             }
         }
         DisplayDatabaseSizes(connector);
