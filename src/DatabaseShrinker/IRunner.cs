@@ -1,4 +1,4 @@
-using DatabaseShrinker;
+namespace DatabaseShrinker;
 
 public interface IRunner
 {

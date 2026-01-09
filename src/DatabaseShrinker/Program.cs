@@ -26,14 +26,14 @@ if (args.Length == 0)
 
 var shrinkSetting = Help.GetSettings(args);
 
-var RunCommand = (string commandArgument, Action<string, ShrinkSetting> action) =>
+void RunCommand(string commandArgument, Action<string, ShrinkSetting> action)
 {
     var indexOf = args.ToList().IndexOf(commandArgument) + 1;
     if (args.Length > indexOf)
     {
         action(args[indexOf], shrinkSetting);
     }
-};
+}
 
 var logger = host.Services.GetRequiredService<ILogger<Program>>();
 var sqlConnectorFactory = host.Services.GetRequiredService<Func<string, ISqlConnector>>();

@@ -1,8 +1,9 @@
 using System.Diagnostics;
-using DatabaseShrinker;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
+
+namespace DatabaseShrinker;
 
 public class Runner(ILogger logger,
     Func<string, ISqlConnector> sqlConnectorFactory) : IRunner
@@ -60,10 +61,10 @@ public class Runner(ILogger logger,
         
         bool largeOnly = setting.ShrinkOnlyLarge ? setting.ShrinkOnlyLarge :  AnsiConsole.Prompt(
             new TextPrompt<bool>("Only large database(s)?")
-            .AddChoice(true)
-            .AddChoice(false)
-            .DefaultValue(true)
-            .WithConverter(choice => choice ? "y" : "n"));
+                .AddChoice(true)
+                .AddChoice(false)
+                .DefaultValue(true)
+                .WithConverter(choice => choice ? "y" : "n"));
         
         var databaseFiles = GetDatabaseFiles(connector, databases);
         if (largeOnly)

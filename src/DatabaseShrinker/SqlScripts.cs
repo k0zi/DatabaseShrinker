@@ -2,28 +2,18 @@ namespace DatabaseShrinker;
 
 public class SqlScripts
 {
-    private readonly string checkDbState;
-    private readonly string getDatabaseFiles;
-    private readonly string listUserDatabases;
-    private readonly string shrinkDatabaseFile;
-    private readonly string queryDbSizes;
-    private readonly string simpleLog;
+    private readonly string _checkDbState = DatabaseShrinker.ResourceLoader.GetResource("DatabaseShrinker.SqlScripts.CheckDbccState.sql");
+    private readonly string _getDatabaseFiles = DatabaseShrinker.ResourceLoader.GetResource("DatabaseShrinker.SqlScripts.GetDatabaseFiles.sql");
+    private readonly string _listUserDatabases = DatabaseShrinker.ResourceLoader.GetResource("DatabaseShrinker.SqlScripts.ListUserDatabases.sql");
+    private readonly string _shrinkDatabaseFile = DatabaseShrinker.ResourceLoader.GetResource("DatabaseShrinker.SqlScripts.ShinkDatabaseFile.sql");
+    private readonly string _queryDbSizes = DatabaseShrinker.ResourceLoader.GetResource("DatabaseShrinker.SqlScripts.QueryDbSizes.sql");
+    private readonly string _simpleLog = DatabaseShrinker.ResourceLoader.GetResource("DatabaseShrinker.SqlScripts.SimpleLog.sql");
 
 
-    public SqlScripts()
-    {
-        checkDbState = DatabaseShrinker.ResourceLoader.GetResource("DatabaseShrinker.SqlScripts.CheckDbccState.sql");
-        getDatabaseFiles = DatabaseShrinker.ResourceLoader.GetResource("DatabaseShrinker.SqlScripts.GetDatabaseFiles.sql");
-        listUserDatabases = DatabaseShrinker.ResourceLoader.GetResource("DatabaseShrinker.SqlScripts.ListUserDatabases.sql");
-        shrinkDatabaseFile = DatabaseShrinker.ResourceLoader.GetResource("DatabaseShrinker.SqlScripts.ShinkDatabaseFile.sql");
-        queryDbSizes = DatabaseShrinker.ResourceLoader.GetResource("DatabaseShrinker.SqlScripts.QueryDbSizes.sql");
-        simpleLog = DatabaseShrinker.ResourceLoader.GetResource("DatabaseShrinker.SqlScripts.SimpleLog.sql");
-    }
-    
-    public string CheckDbccState => checkDbState;
-    public string GetDatabaseFiles => getDatabaseFiles;
-    public string ListUserDatabases => listUserDatabases;
-    public string ShrinkDatabaseFile => shrinkDatabaseFile;
-    public string QueryDbSizes => queryDbSizes;
-    public string SimpleLog => simpleLog;
+    public string CheckDbccState => _checkDbState;
+    public string GetDatabaseFiles => _getDatabaseFiles;
+    public string ListUserDatabases => _listUserDatabases;
+    public string ShrinkDatabaseFile => _shrinkDatabaseFile;
+    public string QueryDbSizes => _queryDbSizes;
+    public string SimpleLog => _simpleLog;
 }

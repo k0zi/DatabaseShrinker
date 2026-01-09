@@ -1,3 +1,5 @@
+namespace DatabaseShrinker;
+
 public class DbccProcess(int sessionId, Spectre.Console.ProgressTask progressTask, double progress = 0.0)
 {
     public int SessionId => sessionId;

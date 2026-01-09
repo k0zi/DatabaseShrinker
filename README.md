@@ -1,7 +1,20 @@
 # DatabaseShrinker
 Shrinks all databases on a database server
 
+## How to install
+
+Use the following command to install the program
+```bash
+dotnet tool install --global DatabaseShrinker
+```
+
 ## How to use
+
+Simply run the program with the following command
+```bash
+shrinkdb -c "connection string"
+```
+
 Use one connection string
 ```
 -c "connection string"
